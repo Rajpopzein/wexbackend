@@ -92,7 +92,7 @@ userRouter.get("/:userId/friends", async (req, res) => {
   try {
     const user = await User.findById(req.params.userId).populate(
       "friends.friendId",
-      "username email"
+      "name email "
     );
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -114,5 +114,94 @@ userRouter.get("/all-users/:userId", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+userRouter.put("/:userId/add-friend", async (req, res) => {
+  const { userId } = req.params;
+  const { friendId } = req.body;
+  console.log("============================", userId, friendId);
+
+  // Check if both userId and friendId are provided
+  if (!userId || !friendId) {
+    return res.status(400).json({ error: "userId and friendId are required" });
+  }
+
+  try {
+    // Check if the friend exists
+    const friend = await User.findById(friendId);
+    if (!friend) {
+      return res.status(404).json({ error: "Friend not found" });
+    }
+
+    // Add the friend to the user's friends list
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $addToSet: { friends: { friendId: friendId } } }, // Add friend if not already in the list
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Friend added successfully", user: updatedUser });
+  } catch (err) {
+    res.status(500).json({ error: "Server error", details: err.message });
+  }
+});
+
+userRouter.get("/:userId/friends", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+
+    const user = await User.findById(userId).populate(
+      "friends.friendId",
+      "name email"
+    );
+
+  
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.friends.length === 0) {
+      return res.status(200).json({ message: "This user has no friends" });
+    }
+
+    res.status(200).json({ friends: user.friends });
+  } catch (err) {
+    res.status(500).json({ error: "Server error", details: err.message });
+  }
+});
+
+
+userRouter.get('/:userId/exclude-self-friends', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+      // Find the user by ID and populate the friends array to get their friend IDs
+      const user = await User.findById(userId).populate('friends.friendId');
+
+      // If the user is not found
+      if (!user) {
+          return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Extract friend IDs
+      const friendIds = user.friends.map(friend => friend.friendId._id);
+
+      // Find all users except the requesting user and their friends
+      const users = await User.find({
+          _id: { $ne: userId, $nin: friendIds }
+      }).select('-friends'); // Exclude the friends field in the response
+
+      res.status(200).json(users);
+  } catch (err) {
+      res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
 
 export default userRouter;

@@ -21,6 +21,7 @@ const jwtGeneratot = ({ data }) => {
   const payload = {
     id: data._id,
     email: data.email,
+    name: data.name,
   };
   try {
     const token = jwt.sign({ data: payload }, privateKey, { expiresIn: "1h" });
